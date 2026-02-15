@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
-using System.Collections.Generic;
+using ORM.Framework;
 using ORM.Models;
+using System.Collections.Generic;
 
 namespace ORM.ServicesV4;
 
@@ -8,14 +9,15 @@ public class UserService : BaseDBService<User>
 {
     protected override string GetTableName() { return "Users"; }
 
-    protected override Dictionary<string, object> MapColumnNamesToValues(User item)
+    protected override Dictionary<string, object> MapColumnNamesToValues(User user)
     {
         var columns = new Dictionary<string, object>();
-        columns.Add("Name", item.Name);
-        columns.Add("Age", item.Age);
-        columns.Add("Username", item.Username);
-        columns.Add("Password", item.Password);
-        columns.Add("Role", item.Role);
+        columns.Add("Name", user.Name);
+        columns.Add("Age", user.Age);
+        columns.Add("Username", user.Username);
+        columns.Add("Password", user.Password);
+        columns.Add("Role", user.Role);
+        columns.Add("Email", user.Email);
         return columns;
     }
 
@@ -23,8 +25,7 @@ public class UserService : BaseDBService<User>
     // פונקציה לאיפוס הטבלה - מוחקת גרסאות ישנות ויוצרת חדשה עם כל העמודות
     public void ResetTable()
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        using var connection = _connectionManager.OpenConnection();
 
         // 1. מחיקת הטבלה הישנה אם קיימת
         var dropCmd = new SqliteCommand("DROP TABLE IF EXISTS Users", connection);
@@ -48,8 +49,7 @@ public class UserService : BaseDBService<User>
     public List<User> GetAllUsers()
     {
         var users = new List<User>();
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        using var connection = _connectionManager.OpenConnection();
 
         // בדיקה שהטבלה בכלל קיימת לפני שמנסים לשלוף (למניעת קריסות)
         var checkCmd = new SqliteCommand("SELECT name FROM sqlite_master WHERE type='table' AND name='Users'", connection);
@@ -74,6 +74,3 @@ public class UserService : BaseDBService<User>
         return users;
     }
 }
-// =============================================================
-// Models & Services
-// =============================================================

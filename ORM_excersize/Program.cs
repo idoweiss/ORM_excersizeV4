@@ -1,11 +1,12 @@
+using Microsoft.Data.Sqlite;
+using ORM.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using Microsoft.Data.Sqlite;
-using ORM.Models; // אם המודל נמצא בקובץ נפרד
-// אם המודל לא בקובץ נפרד, המחלקה User מוגדרת בתחתית הקובץ הזה
+// Make sure your User and UserService classes are visible here.
+// You might need to add: using ORM.Models; 
 
-namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
+namespace ORM.ServicesV4
 {
     class Program
     {
@@ -21,6 +22,8 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
             Console.ResetColor();
 
             SetupDatabase();
+
+            // We assume UserService exists in your external files
             UserService userService = new UserService();
 
             // ---------------------------------------------------------
@@ -29,7 +32,8 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
             // ---------------------------------------------------------
             RunTestCase("Test 1: Regression - Add Standard User", () =>
             {
-                User student = new User
+                // We assume User exists in your external files
+                var student = new User
                 {
                     Name = "Danny",
                     Age = 16,
@@ -43,44 +47,60 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
                 userService.Add(student);
 
                 // Verification
-                if (!CheckIfUserExists("Danny"))
+                int newId = GetUserIdByName("Danny");
+                if (newId == -1)
                     throw new Exception("User 'Danny' was NOT found in the database.");
             });
 
-            
-
             // ---------------------------------------------------------
             // TEST 2: Update Method (Your Exercise)
-            // Goal: Check if the Update method actually changes the DB
+            // Goal: Check if the Update method changes correct fields AND keeps others intact
             // ---------------------------------------------------------
-            RunTestCase("Test 3: Update Method (Your Exercise)", () =>
+            RunTestCase("Test 2: Update Method (Deep Verification)", () =>
             {
                 // 1. Get the ID of 'Danny' (created in Test 1)
                 int dannyId = GetUserIdByName("Danny");
                 if (dannyId == -1) throw new Exception("Setup failed: Could not find 'Danny' to update.");
 
                 // 2. Prepare updated data
-                User updatedData = new User
+                var updatedData = new User
                 {
-                    Name = "Danny Updated",
-                    Age = 17, // Changed from 16
-                    Email = "new_email@test.com",
-                    Username = "danny_d", // Keep same username
-                    Password = "123",
-                    Role = "Student"
+                    Name = "Danny Updated",       // SHOULD CHANGE
+                    Age = 17,                     // SHOULD CHANGE (was 16)
+                    Email = "new_email@test.com", // SHOULD CHANGE
+                    Username = "danny_d",         // SHOULD NOT CHANGE (Keep same)
+                    Password = "123",             // SHOULD NOT CHANGE (Keep same)
+                    Role = "Student"              // SHOULD NOT CHANGE (Keep same)
                 };
 
-                Console.WriteLine($"   Updating User ID {dannyId} to 'Danny Updated'...");
+                Console.WriteLine($"   Updating User ID {dannyId}...");
 
                 // 3. CALL THE STUDENT'S METHOD
                 userService.Update(updatedData, dannyId);
 
-                // 4. Verify
-                if (CheckIfUserExists("Danny"))
-                    throw new Exception("Update Failed: The name is still 'Danny' (Old Name).");
+                // 4. DEEP VERIFICATION
+                // Fetch the actual row from the DB to see what happened
+                var userFromDb = GetUserById(dannyId);
 
-                if (!CheckIfUserExists("Danny Updated"))
-                    throw new Exception("Update Failed: Could not find 'Danny Updated' in the database.");
+                if (userFromDb == null)
+                    throw new Exception("Critical Error: The user seems to have been deleted!");
+
+                // Check Changed Fields
+                if (userFromDb.Name != "Danny Updated")
+                    throw new Exception($"Update Failed: Name should be 'Danny Updated', but found '{userFromDb.Name}'.");
+
+                if (userFromDb.Age != 17)
+                    throw new Exception($"Update Failed: Age should be 17, but found '{userFromDb.Age}'.");
+
+                if (userFromDb.Email != "new_email@test.com")
+                    throw new Exception($"Update Failed: Email should be 'new_email@test.com', but found '{userFromDb.Email}'.");
+
+                // Check Integrity (Fields that shouldn't change)
+                if (userFromDb.Username != "danny_d")
+                    throw new Exception($"Corruption Detected: Username changed to '{userFromDb.Username}' (Should stay 'danny_d').");
+
+                if (userFromDb.Role != "Student")
+                    throw new Exception($"Corruption Detected: Role changed to '{userFromDb.Role}' (Should stay 'Student').");
             });
 
             Console.WriteLine("\n--------------------------------------------------");
@@ -131,7 +151,7 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
             using (var connection = new SqliteConnection($"Data Source={DbPath}"))
             {
                 connection.Open();
-                // FIX: Added Username, Password, Role to the CREATE statement
+                // Ensure this matches your User class structure
                 string sql = @"
                     CREATE TABLE IF NOT EXISTS Users (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -148,20 +168,7 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
                     command.ExecuteNonQuery();
                 }
             }
-            Console.WriteLine("Database 'app.db' reset successfully (Full Schema).");
-        }
-
-        static bool CheckIfUserExists(string name)
-        {
-            using (var connection = new SqliteConnection($"Data Source={DbPath}"))
-            {
-                connection.Open();
-                var command = connection.CreateCommand();
-                command.CommandText = "SELECT COUNT(*) FROM Users WHERE Name = @name";
-                command.Parameters.AddWithValue("@name", name);
-                long count = (long)command.ExecuteScalar();
-                return count > 0;
-            }
+            Console.WriteLine("Database 'app.db' reset successfully.");
         }
 
         static int GetUserIdByName(string name)
@@ -176,9 +183,35 @@ namespace ORM.ServicesV4 // שיניתי ל-V4 כדי שיתאים לתרגיל
                 return result != null ? Convert.ToInt32(result) : -1;
             }
         }
+
+        // Helper to fetch the full object for Deep Verification
+        static User GetUserById(int id)
+        {
+            using (var connection = new SqliteConnection($"Data Source={DbPath}"))
+            {
+                connection.Open();
+                var command = connection.CreateCommand();
+                command.CommandText = "SELECT * FROM Users WHERE Id = @id";
+                command.Parameters.AddWithValue("@id", id);
+
+                using (var reader = command.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        // Manually mapping back to User object for verification
+                        return new User
+                        {
+                            Name = reader["Name"].ToString(),
+                            Age = Convert.ToInt32(reader["Age"]),
+                            Email = reader["Email"] != DBNull.Value ? reader["Email"].ToString() : null,
+                            Username = reader["Username"] != DBNull.Value ? reader["Username"].ToString() : null,
+                            Password = reader["Password"] != DBNull.Value ? reader["Password"].ToString() : null,
+                            Role = reader["Role"] != DBNull.Value ? reader["Role"].ToString() : null
+                        };
+                    }
+                }
+            }
+            return null;
+        }
     }
-
- 
-
-   
 }

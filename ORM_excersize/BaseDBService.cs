@@ -1,13 +1,12 @@
 ﻿using Microsoft.Data.Sqlite;
-using System;
-using System.Collections.Generic;
+using ORM.Framework;
 
 namespace ORM.ServicesV4;
 
 public abstract class BaseDBService<T>
 {
     // מחרוזת החיבור
-    protected string _connectionString = "Data Source=app.db";
+    protected DbConnectionManager _connectionManager = new DbConnectionManager("Data Source=app.db");
 
     protected abstract string GetTableName();
     protected abstract Dictionary<string, object> MapColumnNamesToValues(T item);
@@ -19,8 +18,7 @@ public abstract class BaseDBService<T>
     {
         Dictionary<string, object> columnsData = MapColumnNamesToValues(item);
 
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        using var connection = _connectionManager.OpenConnection();
 
         List<string> columnNames = new List<string>();
         List<string> paramNames = new List<string>();
@@ -46,52 +44,14 @@ public abstract class BaseDBService<T>
         command.ExecuteNonQuery();
     }
 
+    //update table set Name = @Name, Email=@email where Id = @id;
     // ---------------------------------------------------------
     // 2. UPDATE METHOD (EXERCISE)
     // ---------------------------------------------------------
     public void Update(T item, int id)
     {
-        // TODO:  הבאת המידע על שמות העמודות לשינוי 
+      
 
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
-
-        // TODO: שלב א' - הכנת רשימת השינויים (SET Clause)
-        // עליכם ליצור רשימה של מחרוזות. כל מחרוזת צריכה להיות בפורמט: "ColumnName = @ColumnName"
-        // השתמשו בלולאה על המפתחות של columnsData
-
-        List<string> setClauses = new List<string>();
-
-        // --- כתבו את הלולאה כאן ---
-
-
-
-        // TODO: שלב ב' - בניית השאילתה
-        // 1. חברו את הרשימה שיצרתם למחרוזת אחת עם פסיקים (string.Join)
-        // 2. צרו את משפט ה-SQL המלא: UPDATE TableName SET ... WHERE Id = @Id
-
-        string sql = ""; // --- השלימו את השורה הזו ---
-
-
-        using var command = new SqliteCommand(sql, connection);
-
-        // TODO: שלב ג' - הזרקת הערכים (Parameters)
-        // עליכם לרוץ בלולאה על המילון columnsData ולהוסיף את הערכים לפקודה (כמו ב-Add)
-
-        // --- כתבו את הלולאה כאן ---
-
-
-
-        // TODO: שלב ד' - הוספת ה-ID
-        // אל תשכחו! ה-ID הוא הפרמטר הכי חשוב (עבור ה-WHERE). הוסיפו אותו בנפרד.
-
-
-
-        // הרצת הפקודה
-        // command.ExecuteNonQuery(); // (Uncomment this line when ready)
-
-        // זריקת שגיאה זמנית כדי להזכיר לכם לממש את המתודה
-        throw new NotImplementedException("Need to implement the Update method!");
     }
 
     // ---------------------------------------------------------
@@ -99,8 +59,7 @@ public abstract class BaseDBService<T>
     // ---------------------------------------------------------
     public void Delete(int id)
     {
-        using var connection = new SqliteConnection(_connectionString);
-        connection.Open();
+        using var connection = _connectionManager.OpenConnection();
 
         string sql = $"DELETE FROM {GetTableName()} WHERE Id = @id";
 
