@@ -3,8 +3,6 @@ using ORM.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
-// Make sure your User and UserService classes are visible here.
-// You might need to add: using ORM.Models; 
 
 namespace ORM.ServicesV4
 {
@@ -23,7 +21,6 @@ namespace ORM.ServicesV4
 
             SetupDatabase();
 
-            // We assume UserService exists in your external files
             UserService userService = new UserService();
 
             // ---------------------------------------------------------
@@ -32,7 +29,6 @@ namespace ORM.ServicesV4
             // ---------------------------------------------------------
             RunTestCase("Test 1: Regression - Add Standard User", () =>
             {
-                // We assume User exists in your external files
                 var student = new User
                 {
                     Name = "Danny",
@@ -53,10 +49,42 @@ namespace ORM.ServicesV4
             });
 
             // ---------------------------------------------------------
-            // TEST 2: Update Method (Your Exercise)
+            // TEST 2: Null Values Support (NEW)
+            // Goal: Check if the ORM handles C# nulls correctly (converts to DBNull)
+            // ---------------------------------------------------------
+            RunTestCase("Test 2: Null Value Support", () =>
+            {
+                var nullUser = new User
+                {
+                    Name = "MysteryUser",
+                    Age = 99,
+                    Email = null,      // <--- Explicit NULL
+                    Username = null,   // <--- Explicit NULL
+                    Password = "123",
+                    Role = "Guest"
+                };
+
+                Console.WriteLine($"   Adding user with NULL Email and Username...");
+
+                // If the bug exists, this line will crash with "Value must be set"
+                userService.Add(nullUser);
+
+                // Verification
+                int id = GetUserIdByName("MysteryUser");
+                if (id == -1)
+                    throw new Exception("User 'MysteryUser' was NOT found. Did the program crash?");
+
+                // Verify the data is actually null in the DB
+                var storedUser = GetUserById(id);
+                if (storedUser.Email != null)
+                    throw new Exception($"Error: Email should be null, but got '{storedUser.Email}'");
+            });
+
+            // ---------------------------------------------------------
+            // TEST 3: Update Method (Your Exercise)
             // Goal: Check if the Update method changes correct fields AND keeps others intact
             // ---------------------------------------------------------
-            RunTestCase("Test 2: Update Method (Deep Verification)", () =>
+            RunTestCase("Test 3: Update Method (Deep Verification)", () =>
             {
                 // 1. Get the ID of 'Danny' (created in Test 1)
                 int dannyId = GetUserIdByName("Danny");
@@ -79,7 +107,6 @@ namespace ORM.ServicesV4
                 userService.Update(updatedData, dannyId);
 
                 // 4. DEEP VERIFICATION
-                // Fetch the actual row from the DB to see what happened
                 var userFromDb = GetUserById(dannyId);
 
                 if (userFromDb == null)
@@ -151,7 +178,6 @@ namespace ORM.ServicesV4
             using (var connection = new SqliteConnection($"Data Source={DbPath}"))
             {
                 connection.Open();
-                // Ensure this matches your User class structure
                 string sql = @"
                     CREATE TABLE IF NOT EXISTS Users (
                         Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,7 +224,6 @@ namespace ORM.ServicesV4
                 {
                     if (reader.Read())
                     {
-                        // Manually mapping back to User object for verification
                         return new User
                         {
                             Name = reader["Name"].ToString(),

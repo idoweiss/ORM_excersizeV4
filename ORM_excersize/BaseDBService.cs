@@ -1,5 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using ORM.Framework;
+using System;
+using System.Collections.Generic;
 
 namespace ORM.ServicesV4;
 
@@ -38,7 +40,11 @@ public abstract class BaseDBService<T>
 
         foreach (var entry in columnsData)
         {
-            command.Parameters.AddWithValue("@" + entry.Key, entry.Value);
+            // FIX: Convert C# null to DBNull.Value explicitly
+            // תיקון: המרת null של C# ל-DBNull.Value באופן מפורש
+            object safeValue = entry.Value ?? DBNull.Value;
+
+            command.Parameters.AddWithValue("@" + entry.Key, safeValue);
         }
 
         command.ExecuteNonQuery();
@@ -50,8 +56,8 @@ public abstract class BaseDBService<T>
     // ---------------------------------------------------------
     public void Update(T item, int id)
     {
-      
 
+        throw new NotImplementedException();
     }
 
     // ---------------------------------------------------------
