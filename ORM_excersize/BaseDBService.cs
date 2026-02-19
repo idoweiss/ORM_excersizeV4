@@ -20,8 +20,6 @@ public abstract class BaseDBService<T>
     {
         Dictionary<string, object> columnsData = MapColumnNamesToValues(item);
 
-        using var connection = _connectionManager.OpenConnection();
-
         List<string> columnNames = new List<string>();
         List<string> paramNames = new List<string>();
 
@@ -36,12 +34,12 @@ public abstract class BaseDBService<T>
 
         string sql = $"INSERT INTO {GetTableName()} ({cols}) VALUES ({paramsTxt})";
 
-        using var command = new SqliteCommand(sql, connection);
+        using SqliteConnection connection = _connectionManager.OpenConnection();
+        using SqliteCommand command = new SqliteCommand(sql, connection);
 
-        foreach (var entry in columnsData)
+        foreach (KeyValuePair<string, object> entry in columnsData)
         {
             // FIX: Convert C# null to DBNull.Value explicitly
-            // תיקון: המרת null של C# ל-DBNull.Value באופן מפורש
             object safeValue = entry.Value ?? DBNull.Value;
 
             command.Parameters.AddWithValue("@" + entry.Key, safeValue);
@@ -65,11 +63,11 @@ public abstract class BaseDBService<T>
     // ---------------------------------------------------------
     public void Delete(int id)
     {
-        using var connection = _connectionManager.OpenConnection();
-
         string sql = $"DELETE FROM {GetTableName()} WHERE Id = @id";
 
-        using var command = new SqliteCommand(sql, connection);
+        using SqliteConnection connection = _connectionManager.OpenConnection();
+        using SqliteCommand command = new SqliteCommand(sql, connection);
+
         command.Parameters.AddWithValue("@id", id);
 
         command.ExecuteNonQuery();
